@@ -1,0 +1,164 @@
+---
+title: "Ph-IRES phylogeny"
+date: 2022-07-01
+output: Newick-formatted tree file
+---
+```{r setup}
+##finds if required packages are installed, loads them if not
+if (!requireNamespace("BiocManager", quietly=TRUE)) install.packages("BiocManager")
+if (!require("phangorn")) install.packages("phangorn")
+if (!require("ape")) install.packages("ape")
+if (!require("msa")) BiocManager::install("msa")
+if (!require("tinytex")) install.packages("tinytex") 
+if (!require("devtools")) install.packages("devtools") +
+if (!require("tidyverse")) install.packages("tidyverse")
+if (!require("igraph")) install.packages("igraph", type="binary")
+if (!require("ips")) install.packages("ips")
+if(!require("seqinr")) install.packages("seqinr")
+if(!require("ggtext")) install.packages("ggtext")
+if(!require("Biostrings")) BiocManager::install("Biostrings")
+if(!require("microRNA")) BiocManager::install("microRNA")
+if(!require("ggtree")) BiocManager::install("ggtree")
+if (!require("rgl")) install.packages("rgl", type="binary")
+if (!require("RCurl")) install.packages("RCurl", type="binary")
+devtools::install_github("kylebittinger/usedist")
+
+##load required library
+library(tidyverse)
+library(phangorn)
+library(ips)
+library(msa)
+library(tinytex)
+library(usedist)
+library(tidyverse)
+library(seqinr)
+library(Biostrings)
+library(microRNA)
+library(ggtree)
+library(ape)
+library(ggtext)
+#
+#This will need to be set to your working directory
+knitr::opts_knit$set(root.dir = "~/Desktop/phiRes_workshop/workshop_data-analysis/phiRes_phylogeny")
+```
+```{r file read}
+#input directorygigitgg
+indir<-"Dog/CO1/fasta_files"
+filelist<-list.files(indir, pattern = "fasta", full.names= TRUE)
+seq<-Biostrings::readDNAStringSet(filelist)
+seq<-RNA2DNA(seq)
+```
+```{r alignment}
+##multi-sequence alignment.  Muscle is generally the fastest option here.  Other options are ClustalW and ClustalOmega
+
+seqalign<-msa(seq, method= "Muscle", type = "dna", verbose = TRUE)
+
+pd<-msaConvert(seqalign,"phangorn::phyDat")
+```
+```{r Perform distance matrix and distance-based trees}
+
+#margins on heatmap may need to be reduced.
+dm <- dist.ml(pd)
+heatmap(as.matrix(dm), margins=c(18,15), revC = TRUE,cexRow = 0.5, cexCol = 0.5, symm = TRUE)
+
+treeUPGMA  <- upgma(dm)
+plot(treeUPGMA, main="UPGMA")
+
+treeNJ  <- NJ(dm)
+plot(treeNJ, main="NJ")
+```
+```{r ML Model Selection}
+##test models, select lowest AIC
+mt <-modelTest(pd, multicore = TRUE, mc.cores= 6)
+View(mt)
+```
+```{r Initial ModelFit}
+##initial fit, use best fit model from prev chunk
+fit <- as.pml(mt)
+fit
+```
+```{r Optimize Fit and Bootstrap}
+##MAKE SURE TO CHANGE OPTIONS DEPENDING ON YOUR SELECTED MODEL.  
+#?optim.pml gives guidance on how to set optBf and optQ
+#optInv and optGamma should be set depending on whether your model includes +I and/or +G parameters
+
+fit.opt <- optim.pml(fit, model="GTR", optBf=TRUE, optQ=TRUE, optInv=TRUE, optGamma=TRUE,
+                    rearrangement = "NNI", control = pml.control(trace = 0))
+fit.opt
+#main= sets the plot title
+plot(fit.opt, main="TPM+I+G")
+
+#bootstrap model
+bs <- bootstrap.pml(fit.opt, bs=100, optNni=TRUE, multicore=TRUE, mc.cores = 6)
+tree<-plotBS(fit.opt$tree, bs, p = 50, type="p")
+
+#write tree with bootstrap node labels *Change name of output appropriately*
+write.tree(plotBS, file = "dog_CO1_ML_bs.newick")
+
+```
+```{r wrangle and attach metadata}
+
+#note this may need to be changed depending on your data format
+##important, for add_row line, (NA, X) needs to be modified for X so naming file has same number of records as data.  I don't know if this is a bug inherent to ggtree, but it is a workaround.
+
+seq_df<-as.data.frame(seq)
+seq_df$id<-row.names(seq_df)
+rownames(seq_df)<-NULL
+seq_tb<-as_tibble(seq_df) 
+seq.data <- seq_tb %>%
+  mutate(accession=str_extract(id,"[A-Z]{2}_?[0-9]{6}"),
+         sciname=str_extract(id, "[A-Za-z]+ [A-Za-z]+"),
+         genus=str_extract(sciname, "^[A-Za-z]+ "),
+         species=str_extract(sciname, "[A-Za-z]+$"),
+         isolate=str_extract(id, "isolate .*")
+        ) %>%
+  add_row(seq = rep(NA, 42))
+
+attach(seq.data)
+```
+```{r generate trees}
+
+#rooting functions
+
+tree <- midpoint(tree)
+
+#draw tree
+
+treeplot <- ggtree(
+  tree,
+) %<+% seq.data +
+ geom_tiplab(aes(label=paste0('italic(', seq.data$genus, ')~italic(', seq.data$species, ')~(', seq.data$accession, ')')), 
+                parse=TRUE)
+treeplot
+  
+
+geom_nodelab(
+    aes(label=paste0(sciname)))
+  
+  
+  geom_nodelab(
+    mapping = NULL,
+    nudge_x = 0.005,
+    nudge_y = 0,
+    geom = "text",
+    hjust = 0.5,
+    node = "internal",
+    size = 2
+    ) +
+  
+
+,
+    hjust = 0,
+    align = FALSE,
+    linetype = "dotted",
+    linesize = 0.5,
+    geom = "text",
+    offset = 0,
+    as_ylab = FALSE
+)      
+
+
+```
+
+
+
