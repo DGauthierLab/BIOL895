@@ -16,11 +16,13 @@ if (!require("igraph")) install.packages("igraph", type="binary")
 if (!require("ips")) install.packages("ips")
 if(!require("seqinr")) install.packages("seqinr")
 if(!require("ggtext")) install.packages("ggtext")
+if(!require("bios2mds")) install.packages("bios2mds")
 if(!require("Biostrings")) BiocManager::install("Biostrings")
 if(!require("microRNA")) BiocManager::install("microRNA")
 if(!require("ggtree")) BiocManager::install("ggtree")
 if (!require("rgl")) install.packages("rgl", type="binary")
 if (!require("RCurl")) install.packages("RCurl", type="binary")
+devtools::install_github("YuLab-SMU/ggmsa")
 devtools::install_github("kylebittinger/usedist")
 
 ##load required library
@@ -28,6 +30,7 @@ library(tidyverse)
 library(phangorn)
 library(ips)
 library(msa)
+library(bios2mds)
 library(tinytex)
 library(usedist)
 library(tidyverse)
@@ -37,13 +40,14 @@ library(microRNA)
 library(ggtree)
 library(ape)
 library(ggtext)
+library(ggmsa)
 #
 #This will need to be set to your working directory
 knitr::opts_knit$set(root.dir = "~/Desktop/phiRes_workshop/workshop_data-analysis/phiRes_phylogeny")
 ```
 ```{r file read}
-#input directorygigitgg
-indir<-"Dog/CO1/fasta_files"
+#input directory
+indir<-"canidae/co1/fasta_files"
 filelist<-list.files(indir, pattern = "fasta", full.names= TRUE)
 seq<-Biostrings::readDNAStringSet(filelist)
 seq<-RNA2DNA(seq)
@@ -52,6 +56,15 @@ seq<-RNA2DNA(seq)
 ##multi-sequence alignment.  Muscle is generally the fastest option here.  Other options are ClustalW and ClustalOmega
 
 seqalign<-msa(seq, method= "Muscle", type = "dna", verbose = TRUE)
+writeXStringSet(as(unmasked(seqalign), "XStringSet"), file="aln.fasta")
+nt<-readDNAMultipleAlignment("aln.fasta", format = "fasta")
+
+print(seqalign, show="complete")
+
+##ggmsa for prettier alignments
+ggmsa(nt, color = "Clustal", disagreement = TRUE, seq_name = TRUE, start = 100, end = 150) + 
+  geom_seqlogo() + 
+  geom_msaBar() 
 
 pd<-msaConvert(seqalign,"phangorn::phyDat")
 ```
@@ -82,11 +95,11 @@ fit
 #?optim.pml gives guidance on how to set optBf and optQ
 #optInv and optGamma should be set depending on whether your model includes +I and/or +G parameters
 
-fit.opt <- optim.pml(fit, model="GTR", optBf=TRUE, optQ=TRUE, optInv=TRUE, optGamma=TRUE,
+fit.opt <- optim.pml(fit, optBf=TRUE, optQ=TRUE, optInv=TRUE, optGamma=TRUE,
                     rearrangement = "NNI", control = pml.control(trace = 0))
 fit.opt
 #main= sets the plot title
-plot(fit.opt, main="TPM+I+G")
+plot(fit.opt, main="TrN+I")
 
 #bootstrap model
 bs <- bootstrap.pml(fit.opt, bs=100, optNni=TRUE, multicore=TRUE, mc.cores = 6)
@@ -128,14 +141,7 @@ treeplot <- ggtree(
   tree,
 ) %<+% seq.data +
  geom_tiplab(aes(label=paste0('italic(', seq.data$genus, ')~italic(', seq.data$species, ')~(', seq.data$accession, ')')), 
-                parse=TRUE)
-treeplot
-  
-
-geom_nodelab(
-    aes(label=paste0(sciname)))
-  
-  
+                parse=TRUE) +
   geom_nodelab(
     mapping = NULL,
     nudge_x = 0.005,
@@ -144,7 +150,12 @@ geom_nodelab(
     hjust = 0.5,
     node = "internal",
     size = 2
-    ) +
+    )
+treeplot
+  
+
+  
+  g +
   
 
 ,
