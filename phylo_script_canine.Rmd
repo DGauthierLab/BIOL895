@@ -20,9 +20,11 @@ if(!require("bios2mds")) install.packages("bios2mds")
 if(!require("Biostrings")) BiocManager::install("Biostrings")
 if(!require("microRNA")) BiocManager::install("microRNA")
 if(!require("ggtree")) BiocManager::install("ggtree")
+if(!require("ggimage")) BiocManager::install("ggimage")
 if (!require("rgl")) install.packages("rgl", type="binary")
 if (!require("RCurl")) install.packages("RCurl", type="binary")
 devtools::install_github("YuLab-SMU/ggmsa")
+if (!require("YuLab-SMU/treedataverse")) BiocManager::install("YuLab-SMU/treedataverse", type="binary")
 devtools::install_github("kylebittinger/usedist")
 
 ##load required library
@@ -38,9 +40,11 @@ library(seqinr)
 library(Biostrings)
 library(microRNA)
 library(ggtree)
+library(ggimage)
 library(ape)
 library(ggtext)
 library(ggmsa)
+library(ggrepel)
 #
 #This will need to be set to your working directory
 knitr::opts_knit$set(root.dir = "~/Desktop/phiRes_workshop/workshop_data-analysis/phiRes_phylogeny")
@@ -106,7 +110,7 @@ bs <- bootstrap.pml(fit.opt, bs=100, optNni=TRUE, multicore=TRUE, mc.cores = 6)
 tree<-plotBS(fit.opt$tree, bs, p = 50, type="p")
 
 #write tree with bootstrap node labels *Change name of output appropriately*
-write.tree(plotBS, file = "dog_CO1_ML_bs.newick")
+#write.tree(plotBS, file = "dog_CO1_ML_bs.newick")
 
 ```
 ```{r wrangle and attach metadata}
@@ -114,20 +118,6 @@ write.tree(plotBS, file = "dog_CO1_ML_bs.newick")
 #note this may need to be changed depending on your data format
 ##important, for add_row line, (NA, X) needs to be modified for X so naming file has same number of records as data.  I don't know if this is a bug inherent to ggtree, but it is a workaround.
 
-seq_df<-as.data.frame(seq)
-seq_df$id<-row.names(seq_df)
-rownames(seq_df)<-NULL
-seq_tb<-as_tibble(seq_df) 
-seq.data <- seq_tb %>%
-  mutate(accession=str_extract(id,"[A-Z]{2}_?[0-9]{6}"),
-         sciname=str_extract(id, "[A-Za-z]+ [A-Za-z]+"),
-         genus=str_extract(sciname, "^[A-Za-z]+ "),
-         species=str_extract(sciname, "[A-Za-z]+$"),
-         isolate=str_extract(id, "isolate .*")
-        ) %>%
-  add_row(seq = rep(NA, 42))
-
-attach(seq.data)
 ```
 ```{r generate trees}
 
@@ -135,38 +125,51 @@ attach(seq.data)
 
 tree <- midpoint(tree)
 
+#support for tip images
+
+imgdir <- "canidae/pics"
+
 #draw tree
 
+#generate tip label database
+
+tips <- as_tibble(tree$tip.label)
+
+tips <- tips %>% 
+  mutate(accession=str_extract(value,"[A-Z]{2}_?[0-9]{6}"),
+         sciname=str_extract(value, "[A-Z]{1}[a-z]+ [a-z]+ ([a-z]+)?"),
+         sciname=str_replace(sciname, "isolate", ""),
+         sciname=str_replace(sciname, "from", ""),
+         genus=str_extract(sciname, "^[A-Za-z]+ "),
+         species=str_split_i(sciname, " ", 2),
+         subspecies=str_split_i(sciname, " ", 3),
+         isolate=str_extract(value, "(?<=isolate) .*"), 
+         isolate=str_replace_all(isolate,"voucher.*","")
+        ) 
+
 treeplot <- ggtree(
-  tree,
-) %<+% seq.data +
- geom_tiplab(aes(label=paste0('italic(', seq.data$genus, ')~italic(', seq.data$species, ')~(', seq.data$accession, ')')), 
-                parse=TRUE) +
-  geom_nodelab(
-    mapping = NULL,
-    nudge_x = 0.005,
-    nudge_y = 0,
-    geom = "text",
-    hjust = 0.5,
-    node = "internal",
-    size = 2
-    )
-treeplot
+  tree) %<+% tips +
+  xlim(NA, 2) +
+    geom_tiplab(
+      aes(label=paste0('italic(', genus, ')~italic(', species, ')~italic(', subspecies, ')~', isolate, '')), parse=TRUE) +
+  geom_nodelab(aes(label=label, 
+      subset = !is.na(as.numeric(label)) & as.numeric(label) > 80)) +
+  geom_tiplab(aes(subset=grepl("(Dane|Chihuahua)",label), image=paste0(imgdir, '/',label,'.jpg')), 
+                geom="image", offset=1, align=2, size=0.1, by='height') +
+  geom_label_repel(aes(label=label)) +
+  geom_cladelab(node=1, label="test label", align=TRUE,  
+                  offset = .2, textcolor='red', barcolor='red') +
+  geom_treescale(x=0, y=45, width=1, color='red')
   
+   treeplot   
+  
+   
+imgdir <- "canidae/pics"
+   
+   
+  (image=paste0("canidae/pics/",label,'.jpeg')), 
+                geom="image", offset=2, align=2, size=.2)
 
-  
-  g +
-  
-
-,
-    hjust = 0,
-    align = FALSE,
-    linetype = "dotted",
-    linesize = 0.5,
-    geom = "text",
-    offset = 0,
-    as_ylab = FALSE
-)      
 
 
 ```
