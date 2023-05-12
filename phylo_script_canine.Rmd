@@ -147,11 +147,12 @@ tips <- tips %>%
 ```
 
 ```{r generate trees}
-
+dat<-data.frame(node=c(33), annote=c("Vulpes"), image=c(paste0("/Users/dgauthie/Documents/GitHub/BIOL895/canidae/pics/vulpes.jpeg" )), name=c("duck"), offset=c(1))
 
 treeplot <- ggtree(
   tree) %<+% tips +
-  xlim(NA, 1.5) +
+  xlim(NA, 1) +
+  ylim(NA, 100) +
     geom_tiplab(
       aes(label=paste0('italic(', genus, ')~italic(', species, ')~italic(', subspecies, ')~', isolate, '')), parse=TRUE) +
   
@@ -160,27 +161,51 @@ treeplot <- ggtree(
       nudge_x = 0.01
   ) +
 
-  geom_tiplab(aes(subset=grepl("(Dane|Chihuahua)",label), image=paste0(imgdir, '/',label,'.jpg')), 
-                geom="image", offset=1, align=2, size=0.1, by='height') +
+  #geom_tiplab(aes(subset=grepl("(Dane|Chihuahua)",label), image=paste0(imgdir, '/',label,'.jpg')), 
+  #              geom="image", offset=1, align=2, size=0.1, by='height') +
   
-  geom_label_repel(aes(label=label)) +
+  #geom_label_repel(aes(label=label)) +
   
-  geom_cladelab(node=1, label="test label", align=TRUE,  
-                  offset = .2, textcolor='red', barcolor='red') +
+  geom_cladelab(node=82, label="Vulpes", textcolor='blue', barcolor='blue', offset=.3) +
+  geom_hilight(node=83, fill="steelblue", alpha=.6) +
+    geom_hilight(node=17, fill="darkgreen", alpha=.6)
   
-  geom_treescale(x=1, y=20, width=0.01, color='darkgreen')
+  geom_tiplab2(
+                mapping = aes(node=33,image=paste0("/Users/dgauthie/Documents/GitHub/BIOL895/canidae/pics/vulpes.jpg")), 
+                geom="image",
+                        offset=1,
+                        align=2,
+                        size =10
+  ) 
+  
+  #geom_treescale(x=1, y=20, width=0.01, color='darkgreen')
 
 
-treeplot   
+treeplot
 
+```
+```{r tree tools}
 #following can be used to get information on node and clade numbers
 get_taxa_name(treeplot)
 
-
-set.seed(2017)
-tree <- rtree(50)
-
+tbl.tree <- tree %>% as.treedata %>% as_tibble()
+tbl.tree
 ```
 
 
+
+
+
+nwk <- paste0("((((bufonidae, dendrobatidae), ceratophryidae),",
+          "(centrolenidae, leptodactylidae)), hylidae);")
+
+imgdir <- system.file("extdata/frogs", package = "TDbook")
+
+x = read.tree(text = nwk)
+ggtree(x) + xlim(NA, 7) + ylim(NA, 6.2) +
+    geom_tiplab(aes(image=paste0(imgdir, '/', label, '.jpg')), 
+                geom="image", offset=2, align=2, size=.2)  + 
+    geom_tiplab(geom='label', offset=1, hjust=.5) + 
+    geom_image(x=.8, y=5.5, image=paste0(imgdir, "/frog.jpg"), size=.2)
+x
 
