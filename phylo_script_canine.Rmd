@@ -113,7 +113,16 @@ plot(fit.opt, main="TrN+I")
 
 #bootstrap model
 bs <- bootstrap.pml(fit.opt, bs=100, optNni=TRUE, multicore=TRUE, mc.cores = 6)
-tree<-plotBS(fit.opt$tree, bs, p = 50, type="p")
+
+##plotBS functions
+#type = he type of tree to plot, one of "phylogram", "cladogram", "fan", "unrooted", "radial" or "none". If type is "none" the tree is returned with the bootstrap values assigned to the node labels.
+#method = either "FBP" the classical bootstrap (default) or "TBE" (transfer bootstrap)
+#digits = nteger indicating the number of decimal places.
+#p	= only plot support values higher than this percentage number (default is 0).
+
+tree<-plotBS(fit.opt$tree, bs, p = 80, digits = 0, type="p", method="FBP")
+#digits doesn't seem to work in plotBS, so this is a workaround
+tree$node.label<-round(tree$node.label, digits=0)
 
 ```
 
@@ -145,7 +154,7 @@ tips <- tips %>%
         ) 
 ```
 
-```{r generate trees}
+```{r generate trees and options}
 #basic tree with names
 treeplot <- ggtree(
   tree) %<+% tips +
@@ -155,17 +164,21 @@ treeplot <- ggtree(
       aes(label=paste0('italic(', genus, ')~italic(', species, ')~italic(', subspecies, ')~', isolate, '')), parse=TRUE) 
 
 #bootstrap labels  
-treeplot2 <- treeplot +  
+#subset line will set lower cutoff for bootstrap scores
+treeplot <- treeplot +  
   geom_nodelab(aes(label=label, 
       subset = !is.na(as.numeric(label)) & as.numeric(label) > 80), 
       nudge_x = 0.01
   )
 
+
+
 #clade labels
-treeplot3 <- treeplot2 +
+treeplot <- treeplot +
   geom_cladelab(node=81, label="Vulpini", textcolor='red', barcolor='red', offset=.3) +
   geom_hilight(node=81, fill = "red", extend=0.185)
-treeplot3   
+
+treeplot   
 
 ```
 ```{r tree tools}
@@ -174,6 +187,10 @@ get_taxa_name(treeplot)
 
 tbl.tree <- tree %>% as.treedata %>% as_tibble()
 View(tbl.tree)
+
+##export tree in Newick format
+write.tree(tree, file="newick.tree")
+
 ```
 
 
